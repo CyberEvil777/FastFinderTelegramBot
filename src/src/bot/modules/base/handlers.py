@@ -1,9 +1,11 @@
+from django.contrib.postgres.search import TrigramSimilarity
 from telegram import ReplyKeyboardRemove, Update
 from telegram.ext import (CallbackContext, CommandHandler, ContextTypes,
                           Filters, MessageHandler, PollAnswerHandler)
 
 from src.bot.core.helpers import get_or_create_user
 from src.bot.core.telegram import dp
+from src.cloth.models import Profession
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -16,6 +18,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 
 def get_cloth(update: Update, context: CallbackContext) -> None:
+    Profession.objects.annotate(similarity=TrigramSimilarity("name",update.message.text)).filter(similarity__gt=0.3).order_by("-similarity")
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=f"Привет Напиши профессию для поиска",
