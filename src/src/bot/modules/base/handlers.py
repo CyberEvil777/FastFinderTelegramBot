@@ -1,19 +1,12 @@
 import inspect
 
 from django.contrib.postgres.search import TrigramSimilarity
-from django.db.models import QuerySet
-from telegram import ReplyKeyboardRemove, Update, ParseMode
-from telegram.ext import (
-    CallbackContext,
-    CommandHandler,
-    ContextTypes,
-    Filters,
-    MessageHandler,
-    PollAnswerHandler, CallbackQueryHandler,
-)
+from telegram import ParseMode, Update
+from telegram.ext import (CallbackContext, CallbackQueryHandler,
+                          CommandHandler, ContextTypes, Filters,
+                          MessageHandler)
 
 from src.bot.core.helpers import get_or_create_user
-from src.bot.core.parse_city import parse_cloth
 from src.bot.core.telegram import dp
 from src.bot.core.utils import get_cloth_msg
 from src.bot.modules.base.keyboard import build_inlines_menu
@@ -29,13 +22,9 @@ def start(update: Update, context: CallbackContext) -> None:
 
 
 def get_cloth(update: Update, context: CallbackContext) -> None:
-
-
-
     professions = (
-        Profession.objects.prefetch_related("cloth").annotate(
-            similarity=TrigramSimilarity("name", update.message.text)
-        )
+        Profession.objects.prefetch_related("cloth")
+        .annotate(similarity=TrigramSimilarity("name", update.message.text))
         .filter(similarity__gt=0.2)
         .order_by("-similarity")
     )
@@ -65,14 +54,6 @@ def get_cloth(update: Update, context: CallbackContext) -> None:
         disable_web_page_preview=True,
     )
 
-    # for profession in professions:
-    #     cloths = get_cloth_msg(cloths=profession.cloth.all().values("name", "count"))
-    #     msg = f"""Название провессии: {profession.name} \n""" + cloths
-    #     context.bot.send_message(
-    #         chat_id=update.effective_chat.id,
-    #         text=inspect.cleandoc(msg),
-    #     )
-
 
 def get_cloth_on_button(update: Update, context: ContextTypes) -> None:
     """Выдача професии по нажатию кнопки"""
@@ -87,7 +68,6 @@ def get_cloth_on_button(update: Update, context: ContextTypes) -> None:
             chat_id=update.effective_chat.id,
             text=inspect.cleandoc(msg),
         )
-
 
 
 dp.add_handler(CommandHandler("start", start))

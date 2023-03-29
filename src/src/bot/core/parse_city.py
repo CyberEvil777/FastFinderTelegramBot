@@ -1,7 +1,6 @@
 import csv
 from itertools import islice
 
-
 from django.conf import settings
 from django.db import transaction
 
@@ -16,12 +15,12 @@ def parse_cloth():
         batch_size = 100
         clean_data = [
             row
-            for row in cloth_csv if not row.get("Наименование профессии (должности") in professions
+            for row in cloth_csv
+            if not row.get("Наименование профессии (должности") in professions
         ]
 
         profession_only = [
-            row.get("Наименование профессии (должности")
-            for row in clean_data
+            row.get("Наименование профессии (должности") for row in clean_data
         ]
 
         unique_profession = set(profession_only)
@@ -42,9 +41,13 @@ def parse_cloth():
 
         cloth_generator = (
             Cloth(
-                name=row.get("Наименование специальной одежды, специальной обуви и других средств индивидуальной защиты"),
+                name=row.get(
+                    "Наименование специальной одежды, специальной обуви и других средств индивидуальной защиты"
+                ),
                 count=row.get("Норма выдачи на год (штуки, пары, комплекты)"),
-                profession=Profession.objects.filter(name=row.get("Наименование профессии (должности")).first(),
+                profession=Profession.objects.filter(
+                    name=row.get("Наименование профессии (должности")
+                ).first(),
             )
             for row in clean_data
         )
