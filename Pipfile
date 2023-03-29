@@ -10,6 +10,7 @@ pillow = "*"
 django-jazzmin = "*"
 python-decouple = "*"
 psycopg2-binary = "*"
+gunicorn = "*"
 
 [dev-packages]
 black = "*"

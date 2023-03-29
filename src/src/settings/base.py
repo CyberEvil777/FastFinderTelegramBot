@@ -142,3 +142,5 @@ STATIC_ROOT = os.path.join(SOURCES_ROOT, "static")
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 BOT_TOKEN = config("BOT_TOKEN", default="")
+
+PATH_CLOTH = config("PATH_CLOTH", default=None)

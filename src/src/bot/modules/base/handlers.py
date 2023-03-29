@@ -1,16 +1,27 @@
+import inspect
+
 from django.contrib.postgres.search import TrigramSimilarity
-from telegram import ReplyKeyboardRemove, Update
-from telegram.ext import (CallbackContext, CommandHandler, ContextTypes,
-                          Filters, MessageHandler, PollAnswerHandler)
+from django.db.models import QuerySet
+from telegram import ReplyKeyboardRemove, Update, ParseMode
+from telegram.ext import (
+    CallbackContext,
+    CommandHandler,
+    ContextTypes,
+    Filters,
+    MessageHandler,
+    PollAnswerHandler, CallbackQueryHandler,
+)
 
 from src.bot.core.helpers import get_or_create_user
+from src.bot.core.parse_city import parse_cloth
 from src.bot.core.telegram import dp
+from src.bot.core.utils import get_cloth_msg
+from src.bot.modules.base.keyboard import build_inlines_menu
 from src.cloth.models import Profession
 
 
 def start(update: Update, context: CallbackContext) -> None:
     user = get_or_create_user(update.effective_user)
-
     context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=f"Привет {user.name}. Напиши профессию для поиска",
@@ -18,74 +29,67 @@ def start(update: Update, context: CallbackContext) -> None:
 
 
 def get_cloth(update: Update, context: CallbackContext) -> None:
-    Profession.objects.annotate(similarity=TrigramSimilarity("name",update.message.text)).filter(similarity__gt=0.3).order_by("-similarity")
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"Привет Напиши профессию для поиска",
+
+
+
+    professions = (
+        Profession.objects.prefetch_related("cloth").annotate(
+            similarity=TrigramSimilarity("name", update.message.text)
+        )
+        .filter(similarity__gt=0.2)
+        .order_by("-similarity")
     )
 
+    professions_contain = Profession.objects.filter(name__icontains=update.message.text)
 
-def poll(update: Update, context: ContextTypes) -> None:
-    """Создание голосования"""
-    shops = list(Shop.objects.all().values_list("name", flat=True))
-    questions_dict = {shop: 0 for shop in shops}
-    message = context.bot.send_poll(
-        update.effective_chat.id,
-        "Какую еду сегодня закажем?",
-        shops,
-        is_anonymous=False,
-        allows_multiple_answers=True,
+    professions = professions.union(professions_contain)
+
+    if not professions.exists():
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Профессия не найдена",
+        )
+    professions = professions.values_list("name", flat=True)
+    professions_list = list()
+    for profession_el in professions:
+        if len(profession_el) > 25:
+            professions_list.append(profession_el[:25])
+        else:
+            professions_list.append(profession_el)
+    reply_markup = build_inlines_menu(buttons=professions_list, pattern="profession::")
+
+    update.message.reply_text(
+        reply_markup=reply_markup,
+        text="Профессии похожие на ваш запрос",
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
     )
 
-    payload = {
-        message.poll.id: {
-            "questions": shops,
-            "message_id": message.message_id,
-            "chat_id": update.effective_chat.id,
-            "questions_dict": questions_dict,
-            "answers": 0,
-            "winner": None,
-        }
-    }
-    context.bot_data.update(payload)
+    # for profession in professions:
+    #     cloths = get_cloth_msg(cloths=profession.cloth.all().values("name", "count"))
+    #     msg = f"""Название провессии: {profession.name} \n""" + cloths
+    #     context.bot.send_message(
+    #         chat_id=update.effective_chat.id,
+    #         text=inspect.cleandoc(msg),
+    #     )
 
 
-def receive_poll_answer(update: Update, context: ContextTypes) -> None:
-    """Отлов голосов"""
-    answer = update.poll_answer
-    answered_poll = context.bot_data[answer.poll_id]
-    try:
-        questions = answered_poll["questions"]
-    except KeyError:
-        return
-    selected_options = answer.option_ids
+def get_cloth_on_button(update: Update, context: ContextTypes) -> None:
+    """Выдача професии по нажатию кнопки"""
+    _, profession = update.callback_query.data.split("::")
 
-    questions_dict = answered_poll["questions_dict"]
-    for question_id in selected_options:
-        questions_dict[questions[question_id]] += 1
-    answered_poll["answers"] += 1
-    answered_poll["questions_dict"] = questions_dict
-    winner = max(questions_dict, key=questions_dict.get)
-    answered_poll["winner"] = winner
-    shop = Shop.objects.filter(name=winner).first()
-    WinnerShop.objects.get_or_create(shop=shop)
+    professions = Profession.objects.filter(name__icontains=profession)
 
+    for profession in professions:
+        cloths = get_cloth_msg(cloths=profession.cloth.all().values("name", "count"))
+        msg = f"""Название провессии: {profession.name} \n""" + cloths
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=inspect.cleandoc(msg),
+        )
 
-def receive_poll(update: Update, context: ContextTypes) -> None:
-    """On receiving polls, reply to it by a closed poll copying the received poll"""
-    actual_poll = update.effective_message.poll
-    # Only need to set the question and options, since all other parameters don't matter for
-    # a closed poll
-    return update.effective_message.reply_poll(
-        question=actual_poll.question,
-        options=[o.text for o in actual_poll.options],
-        # with is_closed true, the poll/quiz is immediately closed
-        is_closed=True,
-        reply_markup=ReplyKeyboardRemove(),
-    )
 
 
 dp.add_handler(CommandHandler("start", start))
+dp.add_handler(CallbackQueryHandler(get_cloth_on_button, pattern="^profession::"))
 dp.add_handler(MessageHandler(Filters.text & (~Filters.command), get_cloth))
-dp.add_handler(MessageHandler(Filters.poll, receive_poll))
-dp.add_handler(PollAnswerHandler(receive_poll_answer))

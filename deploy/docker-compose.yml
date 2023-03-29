@@ -1,0 +1,78 @@
+# Use postgres/example user/password credentials
+version: '3.1'
+
+services:
+  admin:
+    build:
+      context: ..
+      dockerfile: ./deploy/app.Dockerfile
+    volumes:
+      - media_volume:/usr/src/app/media/
+      - static_volume:/usr/src/app/static/
+    expose:
+      - 80
+    environment:
+      - SQL_ENGINE=django.db.backends.postgresql
+      - POSTGRES_DB=fast_finder
+      - POSTGRES_USER=cyberevil
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - SECRET_KEY=the-most-secret
+    ports:
+      - "80:8001"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:14-alpine
+    volumes:
+      - postgres_data_doc_bot:/var/lib/postgresql/data/
+    environment:
+      - SQL_ENGINE=django.db.backends.postgresql
+      - POSTGRES_DB=fast_finder
+      - POSTGRES_USER=cyberevil
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+
+  bot:
+    build:
+      context: ..
+      dockerfile: ./deploy/app.Dockerfile
+    command: python manage.py bot_polling
+    environment:
+      - BOT_TOKEN=YOUR_TOKEN
+      - SQL_ENGINE=django.db.backends.postgresql
+      - POSTGRES_DB=fast_finder
+      - POSTGRES_USER=cyberevil
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+
+#  # RabbitMQ
+#  rabbit:
+#    hostname: rabbit
+#    image: rabbitmq:3.6.9
+#    environment:
+#      - RABBITMQ_DEFAULT_USER=admin
+#      - RABBITMQ_DEFAULT_PASS=mypass
+#
+#  # Celery worker
+#  worker:
+#    build:
+#      context: ..
+#      dockerfile: ./deploy/app.Dockerfile
+#    command: celery -A doc_bot worker --loglevel=INFO -Q default
+#    volumes:
+#      - .:/code:Z
+#    links:
+#      - db
+#      - rabbit
+#    depends_on:
+#      - rabbit
+
+volumes:
+  postgres_data_doc_bot:
+  media_volume:
+  static_volume:

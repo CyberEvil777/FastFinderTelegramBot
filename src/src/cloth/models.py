@@ -3,7 +3,6 @@ from django.db import models
 # Create your models here.
 
 
-
 # Create your models here.
 
 
@@ -12,7 +11,7 @@ class Profession(models.Model):
 
     name = models.CharField(
         verbose_name="Название провессии",
-        max_length=255,
+        max_length=800,
     )
 
     class Meta:
